@@ -6,11 +6,13 @@
 }
 
 body {
-  background-color: #f3f4f6;
+  background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
   color: #1f2937;
   display: flex;
   justify-content: center;
+  align-items: center;
   min-height: 100vh;
+  padding: 0;
 }
 
 .container {
@@ -18,75 +20,93 @@ body {
   max-width: 500px;
   background-color: white;
   min-height: 100vh;
-  box-shadow: 0 0 20px rgba(0,0,0,0.05);
   display: flex;
   flex-direction: column;
 }
 
+/* Make it look like a beautiful app card on PC */
+@media (min-width: 600px) {
+  body {
+    padding: 20px;
+  }
+  .container {
+    min-height: auto;
+    height: 90vh;
+    max-height: 800px;
+    border-radius: 24px;
+    box-shadow: 0 24px 48px rgba(0,0,0,0.15);
+    overflow: hidden;
+  }
+}
+
 header {
-  padding: 24px 20px;
+  padding: 30px 20px;
   background: linear-gradient(135deg, #4f46e5, #7c3aed);
   color: white;
   text-align: center;
-  border-bottom-left-radius: 20px;
-  border-bottom-right-radius: 20px;
 }
 
 header h1 {
-  font-size: 24px;
-  margin-bottom: 8px;
-}
-
-header p {
-  font-size: 14px;
-  opacity: 0.9;
-  margin-bottom: 16px;
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  letter-spacing: -0.5px;
 }
 
 .status-badge {
   display: inline-block;
   background: rgba(255, 255, 255, 0.2);
-  padding: 6px 12px;
+  padding: 6px 16px;
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
+  backdrop-filter: blur(4px);
 }
 
 main {
-  padding: 24px 20px;
+  padding: 30px 24px;
   flex: 1;
+  overflow-y: auto;
 }
 
 .my-device {
   text-align: center;
   margin-bottom: 40px;
+  padding-bottom: 30px;
+  border-bottom: 1px solid #f3f4f6;
 }
 
 .device-icon {
-  width: 80px;
-  height: 80px;
+  width: 88px;
+  height: 88px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 16px auto;
+  margin: 0 auto 20px auto;
+  box-shadow: 0 8px 16px rgba(79, 70, 229, 0.15);
 }
 
 .device-icon.me {
-  background-color: #e0e7ff;
+  background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
   color: #4f46e5;
 }
 
 .device-icon.them {
-  background-color: #f3f4f6;
+  background: #f3f4f6;
   color: #4b5563;
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
+  box-shadow: none;
 }
 
 .my-device h3 {
   font-size: 18px;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .subtitle {
@@ -95,28 +115,29 @@ main {
 }
 
 .radar-section h2 {
-  font-size: 16px;
-  color: #4b5563;
-  margin-bottom: 16px;
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 20px;
   text-align: center;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
+  font-weight: 700;
 }
 
 .empty-state {
   text-align: center;
-  padding: 40px 0;
+  padding: 50px 0;
   color: #9ca3af;
 }
 
 .spinner {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border: 4px solid #f3f4f6;
   border-top: 4px solid #4f46e5;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 16px auto;
+  animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  margin: 0 auto 20px auto;
 }
 
 @keyframes spin {
@@ -127,28 +148,37 @@ main {
 .peer-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 16px;
+  gap: 20px;
 }
 
 .peer-card {
   background: white;
   border: 2px dashed #e5e7eb;
-  border-radius: 16px;
-  padding: 20px 10px;
+  border-radius: 20px;
+  padding: 24px 10px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .peer-card:hover {
   border-color: #4f46e5;
+  border-style: solid;
   background: #f8fafc;
-  transform: translateY(-2px);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(79, 70, 229, 0.1);
+}
+
+.peer-card:hover .device-icon.them {
+  background: #e0e7ff;
+  color: #4f46e5;
+  transition: all 0.3s ease;
 }
 
 .peer-card h4 {
-  font-size: 14px;
-  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
   color: #1f2937;
 }
 
@@ -156,20 +186,28 @@ main {
   background: #4f46e5;
   color: white;
   border: none;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 12px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
+  width: 90%;
+  transition: background 0.2s;
+}
+
+.peer-card:hover .send-btn {
+  background: #4338ca;
 }
 
 .transfer-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.6);
+  background: rgba(17, 24, 39, 0.7);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -178,29 +216,32 @@ main {
 
 .transfer-box {
   background: white;
-  padding: 30px;
-  border-radius: 20px;
+  padding: 40px 30px;
+  border-radius: 24px;
   text-align: center;
-  width: 80%;
-  max-width: 320px;
+  width: 85%;
+  max-width: 360px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
 .transfer-box h3 {
-  margin: 16px 0;
+  margin: 20px 0;
   color: #1f2937;
+  font-size: 18px;
 }
 
 .progress-bar {
   width: 100%;
-  height: 8px;
-  background: #e5e7eb;
-  border-radius: 4px;
+  height: 10px;
+  background: #f3f4f6;
+  border-radius: 5px;
   overflow: hidden;
+  margin-top: 10px;
 }
 
 .progress-fill {
   height: 100%;
-  background: #4f46e5;
+  background: linear-gradient(90deg, #4f46e5, #7c3aed);
   transition: width 0.3s ease;
 }
 
@@ -211,6 +252,6 @@ main {
 
 @keyframes pulse {
   0% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.1); opacity: 0.7; }
+  50% { transform: scale(1.1); opacity: 0.8; }
   100% { transform: scale(1); opacity: 1; }
 }
