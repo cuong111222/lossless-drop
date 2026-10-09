@@ -167,7 +167,6 @@ function App() {
     <div className="container">
       <header>
         <h1>Video Transfer</h1>
-        <p>Bắn file qua Wi-Fi - Giữ 100% chất lượng</p>
         <div className="status-badge">Trạng thái: {status}</div>
       </header>
 
