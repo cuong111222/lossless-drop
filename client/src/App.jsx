@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import Peer from 'peerjs';
-import { Monitor, Smartphone, Upload, CheckCircle } from 'lucide-react';
+import { Monitor, Smartphone, Upload, CheckCircle, Edit2 } from 'lucide-react';
 import './App.css';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || `http://${window.location.hostname}:3001`;
@@ -175,7 +175,7 @@ function App() {
           <div className="device-icon me">
             {deviceName.includes('iPhone') || deviceName.includes('Android') ? <Smartphone size={48} /> : <Monitor size={48} />}
           </div>
-          <h3>Your device: {deviceName} <button onClick={handleEditName} style={{fontSize:'12px', padding:'4px 8px', marginLeft:'8px', borderRadius:'12px', border:'1px solid #ccc', cursor:'pointer', background:'white'}}>✏️ Edit</button></h3>
+          <h3>Your device: {deviceName} <button onClick={handleEditName} style={{fontSize:'12px', padding:'4px 10px', marginLeft:'10px', borderRadius:'20px', border:'1px solid #e5e7eb', cursor:'pointer', background:'white', display:'inline-flex', alignItems:'center', gap:'4px', color:'#4b5563'}}><Edit2 size={12} /> Edit</button></h3>
           <p className="subtitle">Open this page on another device to receive</p>
         </div>
 
