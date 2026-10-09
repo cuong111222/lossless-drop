@@ -22,6 +22,7 @@ const cleanupPeers = (ip) => {
 
 app.post('/register', (req, res) => {
     let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    if (ip && ip.includes(',')) ip = ip.split(',')[0].trim(); // Get first IP if multiple
     if (ip === '::1') ip = '127.0.0.1';
     if (ip && ip.includes('::ffff:')) ip = ip.split('::ffff:')[1];
     
@@ -54,6 +55,7 @@ app.post('/register', (req, res) => {
 
 app.get('/peers', (req, res) => {
     let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    if (ip && ip.includes(',')) ip = ip.split(',')[0].trim();
     if (ip === '::1') ip = '127.0.0.1';
     if (ip && ip.includes('::ffff:')) ip = ip.split('::ffff:')[1];
     
