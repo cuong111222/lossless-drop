@@ -12,7 +12,7 @@ const peersStore = new Map();
 const cleanupPeers = (ip) => {
     const peers = peersStore.get(ip) || [];
     const now = Date.now();
-    const activePeers = peers.filter(p => now - p.timestamp < 60000);
+    const activePeers = peers.filter(p => now - p.timestamp < 10000); // 10 seconds instead of 60s
     if (activePeers.length > 0) {
         peersStore.set(ip, activePeers);
     } else {
