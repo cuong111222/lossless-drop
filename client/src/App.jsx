@@ -6,17 +6,34 @@ import './App.css';
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || `http://${window.location.hostname}:3001`;
 
 function getDeviceName() {
+  const saved = localStorage.getItem('myDeviceName');
+  if (saved) return saved;
   const ua = navigator.userAgent;
-  if (/iPad|iPhone|iPod/.test(ua)) return 'iPhone/iPad';
-  if (/Android/.test(ua)) return 'Android';
-  if (/Mac/.test(ua)) return 'MacBook';
-  if (/Windows/.test(ua)) return 'Windows PC';
-  return 'Thiết bị lạ';
+  let base = 'Thiết bị';
+  if (/iPad|iPhone|iPod/.test(ua)) base = 'iPhone';
+  else if (/Android/.test(ua)) base = 'Android';
+  else if (/Mac/.test(ua)) base = 'MacBook';
+  else if (/Windows/.test(ua)) base = 'Windows';
+  const newName = ${base} ;
+  localStorage.setItem('myDeviceName', newName);
+  return newName;
 }
 
 function App() {
   const [peerId, setPeerId] = useState('');
-  const [deviceName] = useState(getDeviceName());
+  const [deviceName, setDeviceName] = useState(getDeviceName());
+
+  const handleEditName = () => {
+    const newName = prompt('Nhập tên thiết bị của bạn:', deviceName);
+    if (newName && newName.trim() !== '') {
+      setDeviceName(newName.trim());
+      localStorage.setItem('myDeviceName', newName.trim());
+      if (peerRef.current && peerRef.current.id) {
+        registerWithServer(peerRef.current.id, newName.trim());
+      }
+    }
+  };
+
   const [peers, setPeers] = useState([]);
   const [status, setStatus] = useState('Đang kết nối...');
   const [transferProgress, setTransferProgress] = useState(0);
@@ -170,7 +187,7 @@ function App() {
           <div className="device-icon me">
             {deviceName.includes('iPhone') || deviceName.includes('Android') ? <Smartphone size={48} /> : <Monitor size={48} />}
           </div>
-          <h3>Thiết bị của bạn: {deviceName}</h3>
+          <h3>Thiết bị của bạn: {deviceName} <button onClick={handleEditName} style={{fontSize:'12px', padding:'4px 8px', marginLeft:'8px', borderRadius:'12px', border:'1px solid #ccc', cursor:'pointer'}}>✏️ Sửa</button></h3>
           <p className="subtitle">Mở trang này trên điện thoại kia để nhận</p>
         </div>
 
