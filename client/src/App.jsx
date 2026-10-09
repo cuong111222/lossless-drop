@@ -27,8 +27,15 @@ function App() {
   const targetPeerIdRef = useRef(null);
 
   useEffect(() => {
-    // 1. Initialize PeerJS (using their free public cloud server for signaling the WebRTC connection)
-    const peer = new Peer();
+    // Generate or load a stable ID from localStorage to prevent ghost devices on refresh
+    let savedId = localStorage.getItem('myPeerId');
+    if (!savedId) {
+      savedId = 'user-' + Math.random().toString(36).substring(2, 11);
+      localStorage.setItem('myPeerId', savedId);
+    }
+
+    // 1. Initialize PeerJS with the stable ID
+    const peer = new Peer(savedId);
     peerRef.current = peer;
 
     peer.on('open', (id) => {
