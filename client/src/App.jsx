@@ -176,7 +176,7 @@ function App() {
             {deviceName.includes('iPhone') || deviceName.includes('Android') ? <Smartphone size={48} /> : <Monitor size={48} />}
           </div>
           <h3>Your device: {deviceName} <button onClick={handleEditName} style={{fontSize:'12px', padding:'4px 10px', marginLeft:'10px', borderRadius:'20px', border:'1px solid #e5e7eb', cursor:'pointer', background:'white', display:'inline-flex', alignItems:'center', gap:'4px', color:'#4b5563'}}><Edit2 size={12} /> Edit</button></h3>
-          <p className="subtitle">Open this page on another device to receive</p>
+          <p className="subtitle">Open this page on another device on the same Wi-Fi to receive</p>
         </div>
 
         <div className="radar-section">
