@@ -22,9 +22,13 @@ const cleanupPeers = (ip) => {
 
 app.post('/register', (req, res) => {
     let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    // Fix for local testing (IPv6 localhost)
     if (ip === '::1') ip = '127.0.0.1';
     if (ip && ip.includes('::ffff:')) ip = ip.split('::ffff:')[1];
+    
+    // Fix for local testing: group all local LAN IPs together
+    if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip === '127.0.0.1') {
+        ip = 'LOCAL_NETWORK';
+    }
 
     const { peerId, deviceName } = req.body;
     
@@ -52,6 +56,11 @@ app.get('/peers', (req, res) => {
     let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     if (ip === '::1') ip = '127.0.0.1';
     if (ip && ip.includes('::ffff:')) ip = ip.split('::ffff:')[1];
+    
+    // Fix for local testing: group all local LAN IPs together
+    if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip === '127.0.0.1') {
+        ip = 'LOCAL_NETWORK';
+    }
 
     cleanupPeers(ip);
     
