@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import Peer from 'peerjs';
-import { Monitor, Smartphone, Upload, Download, CheckCircle, AlertCircle } from 'lucide-react';
+import { Monitor, Smartphone, Upload, CheckCircle } from 'lucide-react';
 import './App.css';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || `http://${window.location.hostname}:3001`;
@@ -14,7 +14,8 @@ function getDeviceName() {
   else if (/Android/.test(ua)) base = 'Android';
   else if (/Mac/.test(ua)) base = 'MacBook';
   else if (/Windows/.test(ua)) base = 'Windows';
-  const newName = ${base} ;
+  
+  const newName = `${base} ${Math.floor(Math.random() * 1000)}`;
   localStorage.setItem('myDeviceName', newName);
   return newName;
 }
@@ -22,18 +23,6 @@ function getDeviceName() {
 function App() {
   const [peerId, setPeerId] = useState('');
   const [deviceName, setDeviceName] = useState(getDeviceName());
-
-  const handleEditName = () => {
-    const newName = prompt('Nhập tên thiết bị của bạn:', deviceName);
-    if (newName && newName.trim() !== '') {
-      setDeviceName(newName.trim());
-      localStorage.setItem('myDeviceName', newName.trim());
-      if (peerRef.current && peerRef.current.id) {
-        registerWithServer(peerRef.current.id, newName.trim());
-      }
-    }
-  };
-
   const [peers, setPeers] = useState([]);
   const [status, setStatus] = useState('Đang kết nối...');
   const [transferProgress, setTransferProgress] = useState(0);
@@ -44,33 +33,27 @@ function App() {
   const targetPeerIdRef = useRef(null);
 
   useEffect(() => {
-    // Generate or load a stable ID from localStorage to prevent ghost devices on refresh
     let savedId = localStorage.getItem('myPeerId');
     if (!savedId) {
       savedId = 'user-' + Math.random().toString(36).substring(2, 11);
       localStorage.setItem('myPeerId', savedId);
     }
 
-    // 1. Initialize PeerJS with the stable ID
     const peer = new Peer(savedId);
     peerRef.current = peer;
 
     peer.on('open', (id) => {
       setPeerId(id);
       setStatus('Sẵn sàng');
-      
-      // Register with our local discovery server
       registerWithServer(id, deviceName);
     });
 
     peer.on('connection', (conn) => {
-      // Receiving connection
       conn.on('data', (data) => {
         if (data.type === 'file') {
           setIsTransferring(true);
           setTransferProgress(100);
           
-          // Trigger download
           const blob = new Blob([data.file]);
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -97,11 +80,9 @@ function App() {
       setStatus('Lỗi kết nối: ' + err.type);
     });
 
-    // 2. Poll for peers on the same IP
     const interval = setInterval(() => {
       if (peerRef.current && peerRef.current.id) {
         fetchPeers(peerRef.current.id);
-        // re-register to keep alive
         registerWithServer(peerRef.current.id, deviceName);
       }
     }, 3000);
@@ -130,11 +111,21 @@ function App() {
     try {
       const res = await fetch(`${SERVER_URL}/peers`);
       const data = await res.json();
-      // Filter out ourselves
       const others = data.peers.filter(p => p.peerId !== currentId);
       setPeers(others);
     } catch (e) {
       console.log('Error fetching peers');
+    }
+  };
+
+  const handleEditName = () => {
+    const newName = prompt('Nhập tên thiết bị của bạn:', deviceName);
+    if (newName && newName.trim() !== '') {
+      setDeviceName(newName.trim());
+      localStorage.setItem('myDeviceName', newName.trim());
+      if (peerRef.current && peerRef.current.id) {
+        registerWithServer(peerRef.current.id, newName.trim());
+      }
     }
   };
 
@@ -149,14 +140,12 @@ function App() {
 
     setStatus(`Đang gửi: ${file.name}...`);
     setIsTransferring(true);
-    setTransferProgress(10); // Fake progress to show activity
+    setTransferProgress(10);
 
     const conn = peerRef.current.connect(targetPeerIdRef.current);
     
     conn.on('open', () => {
       setTransferProgress(50);
-      
-      // Send the file
       conn.send({
         type: 'file',
         file: file,
@@ -187,7 +176,7 @@ function App() {
           <div className="device-icon me">
             {deviceName.includes('iPhone') || deviceName.includes('Android') ? <Smartphone size={48} /> : <Monitor size={48} />}
           </div>
-          <h3>Thiết bị của bạn: {deviceName} <button onClick={handleEditName} style={{fontSize:'12px', padding:'4px 8px', marginLeft:'8px', borderRadius:'12px', border:'1px solid #ccc', cursor:'pointer'}}>✏️ Sửa</button></h3>
+          <h3>Thiết bị của bạn: {deviceName} <button onClick={handleEditName} style={{fontSize:'12px', padding:'4px 8px', marginLeft:'8px', borderRadius:'12px', border:'1px solid #ccc', cursor:'pointer', background:'white'}}>✏️ Sửa</button></h3>
           <p className="subtitle">Mở trang này trên điện thoại kia để nhận</p>
         </div>
 
