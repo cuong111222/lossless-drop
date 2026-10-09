@@ -9,7 +9,7 @@ function getDeviceName() {
   const saved = localStorage.getItem('myDeviceName');
   if (saved) return saved;
   const ua = navigator.userAgent;
-  let base = 'Thiết bị';
+  let base = 'Device';
   if (/iPad|iPhone|iPod/.test(ua)) base = 'iPhone';
   else if (/Android/.test(ua)) base = 'Android';
   else if (/Mac/.test(ua)) base = 'MacBook';
@@ -24,7 +24,7 @@ function App() {
   const [peerId, setPeerId] = useState('');
   const [deviceName, setDeviceName] = useState(getDeviceName());
   const [peers, setPeers] = useState([]);
-  const [status, setStatus] = useState('Đang kết nối...');
+  const [status, setStatus] = useState('Connecting...');
   const [transferProgress, setTransferProgress] = useState(0);
   const [isTransferring, setIsTransferring] = useState(false);
   
@@ -44,7 +44,7 @@ function App() {
 
     peer.on('open', (id) => {
       setPeerId(id);
-      setStatus('Sẵn sàng');
+      setStatus('Ready');
       registerWithServer(id, deviceName);
     });
 
@@ -71,13 +71,13 @@ function App() {
       });
       
       conn.on('open', () => {
-        setStatus('Đã kết nối với một thiết bị khác!');
+        setStatus('Connected to another device!');
       });
     });
 
     peer.on('error', (err) => {
       console.error(err);
-      setStatus('Lỗi kết nối: ' + err.type);
+      setStatus('Connection error: ' + err.type);
     });
 
     const interval = setInterval(() => {
@@ -119,7 +119,7 @@ function App() {
   };
 
   const handleEditName = () => {
-    const newName = prompt('Nhập tên thiết bị của bạn:', deviceName);
+    const newName = prompt('Enter your device name:', deviceName);
     if (newName && newName.trim() !== '') {
       setDeviceName(newName.trim());
       localStorage.setItem('myDeviceName', newName.trim());
@@ -138,7 +138,7 @@ function App() {
     const file = e.target.files[0];
     if (!file || !targetPeerIdRef.current) return;
 
-    setStatus(`Đang gửi: ${file.name}...`);
+    setStatus(`Sending: ${file.name}...`);
     setIsTransferring(true);
     setTransferProgress(10);
 
@@ -153,12 +153,12 @@ function App() {
       });
       
       setTransferProgress(100);
-      setStatus(`Đã gửi xong ${file.name}!`);
+      setStatus(`Sent ${file.name} successfully!`);
       
       setTimeout(() => {
         setIsTransferring(false);
         setTransferProgress(0);
-        setStatus('Sẵn sàng');
+        setStatus('Ready');
       }, 3000);
     });
   };
@@ -167,7 +167,7 @@ function App() {
     <div className="container">
       <header>
         <h1>Video Transfer</h1>
-        <div className="status-badge">Trạng thái: {status}</div>
+        <div className="status-badge">Status: {status}</div>
       </header>
 
       <main>
@@ -175,16 +175,16 @@ function App() {
           <div className="device-icon me">
             {deviceName.includes('iPhone') || deviceName.includes('Android') ? <Smartphone size={48} /> : <Monitor size={48} />}
           </div>
-          <h3>Thiết bị của bạn: {deviceName} <button onClick={handleEditName} style={{fontSize:'12px', padding:'4px 8px', marginLeft:'8px', borderRadius:'12px', border:'1px solid #ccc', cursor:'pointer', background:'white'}}>✏️ Sửa</button></h3>
-          <p className="subtitle">Mở trang này trên điện thoại kia để nhận</p>
+          <h3>Your device: {deviceName} <button onClick={handleEditName} style={{fontSize:'12px', padding:'4px 8px', marginLeft:'8px', borderRadius:'12px', border:'1px solid #ccc', cursor:'pointer', background:'white'}}>✏️ Edit</button></h3>
+          <p className="subtitle">Open this page on another device to receive</p>
         </div>
 
         <div className="radar-section">
-          <h2>Các thiết bị xung quanh</h2>
+          <h2>Nearby Devices</h2>
           {peers.length === 0 ? (
             <div className="empty-state">
               <div className="spinner"></div>
-              <p>Đang tìm kiếm thiết bị trên cùng mạng Wi-Fi...</p>
+              <p>Searching for devices on the same Wi-Fi...</p>
             </div>
           ) : (
             <div className="peer-list">
@@ -195,7 +195,7 @@ function App() {
                   </div>
                   <h4>{p.deviceName}</h4>
                   <button className="send-btn">
-                    <Upload size={16} /> Gửi File
+                    <Upload size={16} /> Send File
                   </button>
                 </div>
               ))}
@@ -207,7 +207,7 @@ function App() {
           <div className="transfer-overlay">
             <div className="transfer-box">
               {transferProgress < 100 ? <Upload size={48} className="pulse" /> : <CheckCircle size={48} color="green" />}
-              <h3>{transferProgress < 100 ? 'Đang chuyển file...' : 'Hoàn tất!'}</h3>
+              <h3>{transferProgress < 100 ? 'Transferring file...' : 'Done!'}</h3>
               <div className="progress-bar">
                 <div className="progress-fill" style={{ width: `${transferProgress}%` }}></div>
               </div>
