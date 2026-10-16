@@ -76,23 +76,40 @@ export default function App() {
 
   // Initialize PeerJS
   useEffect(() => {
-    let savedId = localStorage.getItem('dropbridge_peerId');
-    if (!savedId) {
-      savedId = 'db_' + Math.random().toString(36).substring(2, 10);
-      localStorage.setItem('dropbridge_peerId', savedId);
+    let savedPin = sessionStorage.getItem('dropbridge_pin');
+    if (!savedPin) {
+      savedPin = Math.floor(100000 + Math.random() * 900000).toString();
+      sessionStorage.setItem('dropbridge_pin', savedPin);
     }
+    setMyPin(savedPin);
 
-    const isSecure = window.location.protocol === 'https:';
+    // Deterministic peer ID bound to PIN: allows direct pairing anywhere in the world without any database!
+    const directPeerId = `drop-${savedPin}`;
+
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isSecure = window.location.protocol === 'https:';
 
-    // Connect to embedded PeerServer or fallback to PeerJS cloud
     let peerInstance = null;
-    try {
-      peerInstance = new Peer(savedId, {
-        host: isLocal ? window.location.hostname : window.location.hostname,
-        port: isLocal ? 3001 : (isSecure ? 443 : 80),
-        path: '/peerjs',
-        secure: isSecure,
+    if (isLocal) {
+      // In local dev, connect to local ExpressPeerServer
+      try {
+        peerInstance = new Peer(directPeerId, {
+          host: window.location.hostname,
+          port: 3001,
+          path: '/peerjs',
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:global.stun.twilio.com:3478' }
+            ]
+          }
+        });
+      } catch (e) {
+        peerInstance = new Peer(directPeerId);
+      }
+    } else {
+      // On Vercel / Cloud, use global PeerJS cloud infrastructure with STUN/TURN
+      peerInstance = new Peer(directPeerId, {
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -100,8 +117,6 @@ export default function App() {
           ]
         }
       });
-    } catch (e) {
-      peerInstance = new Peer(savedId);
     }
 
     peerRef.current = peerInstance;
@@ -109,9 +124,8 @@ export default function App() {
     peerInstance.on('open', (id) => {
       setPeerId(id);
       setIsPeerReady(true);
-      setStatus('Sẵn sàng kết nối');
+      setStatus('Sẵn sàng kết nối P2P');
       registerWithServer(id, deviceName);
-      generatePin(id);
     });
 
     peerInstance.on('connection', (conn) => {
@@ -120,24 +134,13 @@ export default function App() {
     });
 
     peerInstance.on('error', (err) => {
-      console.warn('Peer error, fallback to cloud:', err);
-      if (err.type === 'server-error' || err.type === 'socket-error') {
-        // Fallback to default PeerJS cloud
-        try {
-          const fallbackPeer = new Peer(savedId);
-          peerRef.current = fallbackPeer;
-          fallbackPeer.on('open', (id) => {
-            setPeerId(id);
-            setIsPeerReady(true);
-            setStatus('Sẵn sàng (Cloud P2P)');
-            registerWithServer(id, deviceName);
-            generatePin(id);
-          });
-          fallbackPeer.on('connection', (conn) => {
-            connRef.current = conn;
-            setupConnectionHandlers(conn);
-          });
-        } catch (_) {}
+      console.warn('PeerJS event:', err.type, err);
+      if (err.type === 'unavailable-id') {
+        // Regenerate PIN if collision
+        const newPin = Math.floor(100000 + Math.random() * 900000).toString();
+        sessionStorage.setItem('dropbridge_pin', newPin);
+        setMyPin(newPin);
+        window.location.reload();
       }
     });
 
@@ -204,19 +207,11 @@ export default function App() {
       return;
     }
 
-    try {
-      setStatus(`Đang tìm mã PIN ${targetPin}...`);
-      const res = await fetch(`/room/join/${targetPin}`);
-      const data = await res.json();
-      if (!res.ok || !data.peer) {
-        setPinError(data.error || 'Không tìm thấy thiết bị với mã PIN này');
-        return;
-      }
-
-      handleDeviceClick(data.peer.peerId, data.peer.deviceName);
-    } catch (err) {
-      setPinError('Lỗi kết nối máy chủ');
-    }
+    setStatus(`Đang kết nối tới mã PIN ${targetPin}...`);
+    const directTargetPeerId = `drop-${targetPin}`;
+    
+    // Connect directly via P2P
+    handleDeviceClick(directTargetPeerId, `Thiết bị #${targetPin}`);
   };
 
   // Setup connection event handlers
