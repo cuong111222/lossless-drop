@@ -415,7 +415,7 @@ export default function App() {
             </div>
             <div className="brand-titles">
               <h1 className="brand-name">CuvoDrop</h1>
-              <span className="brand-badge">by Cuvotech</span>
+              <a href="https://cuvotech.com" target="_blank" rel="noopener noreferrer" className="brand-badge">by Cuvotech ↗</a>
             </div>
           </div>
 
@@ -549,12 +549,18 @@ export default function App() {
                   
                   <form onSubmit={handlePinConnect} className="join-form">
                     <input 
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       placeholder="• • • • • •"
                       value={inputPin}
-                      onChange={(e) => setInputPin(e.target.value)}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/\D/g, '').slice(0, 6);
+                        setInputPin(clean);
+                      }}
                       maxLength={6}
                       className="input-pin-digits"
+                      autoComplete="one-time-code"
                       autoFocus
                     />
                     <button type="submit" className="btn-join-submit">
@@ -646,7 +652,7 @@ export default function App() {
 
       {/* FOOTER */}
       <footer className="cuvo-footer">
-        <p>© 2026 CuvoDrop - Ultra-fast P2P transfer engine powered by <strong>Cuvotech</strong>.</p>
+        <p>© 2026 CuvoDrop - Ultra-fast P2P transfer engine powered by <a href="https://cuvotech.com" target="_blank" rel="noopener noreferrer" className="cuvo-link"><strong>Cuvotech</strong> ↗</a>. All rights reserved.</p>
       </footer>
 
       {/* HIDDEN FILE INPUT */}

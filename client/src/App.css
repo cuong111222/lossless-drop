@@ -27,6 +27,16 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Hide number spinner arrows across all browsers */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+input[type=number] {
+  -moz-appearance: textfield !important;
+}
+
 body {
   background-color: var(--bg-main);
   color: var(--text-main);
@@ -127,6 +137,14 @@ body {
   border: 1px solid rgba(99, 102, 241, 0.25);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.brand-badge:hover {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: rgba(99, 102, 241, 0.5);
+  color: #c7d2fe;
 }
 
 .status-pill {
@@ -720,6 +738,18 @@ body {
 
 .cuvo-footer strong {
   color: #818cf8;
+}
+
+.cuvo-link {
+  color: #818cf8;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.cuvo-link:hover {
+  color: #a5b4fc;
+  text-decoration: underline;
 }
 
 /* MODALS */
