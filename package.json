@@ -1,0 +1,23 @@
+{
+  "name": "dropbridge-transfer",
+  "version": "1.0.0",
+  "description": "P2P WebRTC Video & File Transfer for iOS and Android",
+  "scripts": {
+    "build:client": "npm --prefix client run build",
+    "start": "node server/index.js",
+    "build": "npm --prefix client run build",
+    "server": "node server/index.js",
+    "client": "npm --prefix client run dev"
+  },
+  "keywords": [
+    "p2p",
+    "webrtc",
+    "ios",
+    "android",
+    "file-transfer",
+    "airdrop"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+
