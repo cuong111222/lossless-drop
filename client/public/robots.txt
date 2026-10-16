@@ -1,3 +1,12 @@
 User-agent: *
 Allow: /
+
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+User-agent: Googlebot
+Allow: /
+
+Sitemap: https://drop.cuvotech.com/sitemap.xml
 Sitemap: https://share.cuvotech.com/sitemap.xml
