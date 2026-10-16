@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Peer from 'peerjs';
 import { 
-  Smartphone, Monitor, Upload, Download, CheckCircle2, 
-  Edit3, QrCode, Wifi, KeyRound, Play, X, RefreshCw, 
-  ShieldCheck, Zap, AlertCircle, Copy, Check
+  Smartphone, Monitor, Laptop, Upload, Download, CheckCircle2, 
+  Edit2, QrCode, Wifi, KeyRound, Play, X, Shield, Zap, 
+  Copy, Check, FileVideo, HardDrive, ArrowRight, ChevronDown, ChevronUp, Share2
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -12,20 +12,22 @@ import './App.css';
 const CHUNK_SIZE = 64 * 1024; // 64 KB chunks
 const MAX_BUFFERED_AMOUNT = 8 * 1024 * 1024; // 8 MB backpressure threshold
 
-function getDeviceName() {
-  const saved = localStorage.getItem('dropbridge_deviceName');
-  if (saved) return saved;
+function getDevicePlatform() {
   const ua = navigator.userAgent;
-  let base = 'Thiết bị';
-  if (/iPad|iPhone|iPod/.test(ua)) base = 'iPhone';
-  else if (/Android/.test(ua)) base = 'Android Phone';
-  else if (/Macintosh|Mac OS X/.test(ua)) base = 'MacBook';
-  else if (/Windows/.test(ua)) base = 'Windows PC';
-  else if (/Linux/.test(ua)) base = 'Linux';
-  
-  const newName = `${base} ${Math.floor(100 + Math.random() * 900)}`;
-  localStorage.setItem('dropbridge_deviceName', newName);
-  return newName;
+  if (/iPad|iPhone|iPod/.test(ua)) return { type: 'ios', name: 'iPhone' };
+  if (/Android/.test(ua)) return { type: 'android', name: 'Android Phone' };
+  if (/Macintosh|Mac OS X/.test(ua)) return { type: 'mac', name: 'MacBook' };
+  if (/Windows/.test(ua)) return { type: 'windows', name: 'Windows PC' };
+  return { type: 'device', name: 'Device' };
+}
+
+function getStoredDeviceName() {
+  const saved = localStorage.getItem('cuvodrop_dev_name');
+  if (saved) return saved;
+  const platform = getDevicePlatform();
+  const generated = `${platform.name} ${Math.floor(100 + Math.random() * 900)}`;
+  localStorage.setItem('cuvodrop_dev_name', generated);
+  return generated;
 }
 
 function formatBytes(bytes, decimals = 1) {
@@ -43,57 +45,48 @@ function formatSpeed(bytesPerSec) {
 }
 
 export default function App() {
+  const [deviceName, setDeviceName] = useState(getStoredDeviceName());
   const [peerId, setPeerId] = useState('');
-  const [deviceName, setDeviceName] = useState(getDeviceName());
   const [peers, setPeers] = useState([]);
-  const [activeTab, setActiveTab] = useState('wifi'); // 'wifi' | 'pin'
-  const [status, setStatus] = useState('Khởi tạo kết nối P2P...');
-  const [isPeerReady, setIsPeerReady] = useState(false);
-
-  // Room PIN state
+  const [activeTab, setActiveTab] = useState('radar'); // 'radar' | 'pin'
+  const [statusText, setStatusText] = useState('Initializing P2P network...');
   const [myPin, setMyPin] = useState('');
   const [inputPin, setInputPin] = useState('');
-  const [isCopiedPin, setIsCopiedPin] = useState(false);
-  const [pinError, setPinError] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
+  const [activeFaq, setActiveFaq] = useState(null);
 
   // Transfer State
-  const [transferState, setTransferState] = useState(null); 
-  // { mode: 'sending'|'receiving', fileName, fileSize, progress, speed, bytesDone, totalBytes, eta, url, mimeType, error }
-  
+  const [transfer, setTransfer] = useState(null);
   // Received media modal
-  const [receivedFile, setReceivedFile] = useState(null);
+  const [receivedMedia, setReceivedMedia] = useState(null);
 
   const peerRef = useRef(null);
   const connRef = useRef(null);
   const fileInputRef = useRef(null);
   const targetPeerRef = useRef(null);
 
-  // Chunks buffer for receiving
+  // Receiving buffer
   const rxBufferRef = useRef([]);
   const rxMetaRef = useRef(null);
   const rxStartTimeRef = useRef(0);
-  const rxLastBytesRef = useRef(0);
 
-  // Initialize PeerJS
   useEffect(() => {
-    let savedPin = sessionStorage.getItem('dropbridge_pin');
+    let savedPin = sessionStorage.getItem('cuvodrop_pin');
     if (!savedPin) {
       savedPin = Math.floor(100000 + Math.random() * 900000).toString();
-      sessionStorage.setItem('dropbridge_pin', savedPin);
+      sessionStorage.setItem('cuvodrop_pin', savedPin);
     }
     setMyPin(savedPin);
 
-    // Deterministic peer ID bound to PIN: allows direct pairing anywhere in the world without any database!
-    const directPeerId = `drop-${savedPin}`;
+    // Direct deterministic peerId for global cloud pairing
+    const directPeerId = `cuvo-${savedPin}`;
 
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const isSecure = window.location.protocol === 'https:';
 
-    let peerInstance = null;
+    let peer = null;
     if (isLocal) {
-      // In local dev, connect to local ExpressPeerServer
       try {
-        peerInstance = new Peer(directPeerId, {
+        peer = new Peer(directPeerId, {
           host: window.location.hostname,
           port: 3001,
           path: '/peerjs',
@@ -104,12 +97,12 @@ export default function App() {
             ]
           }
         });
-      } catch (e) {
-        peerInstance = new Peer(directPeerId);
+      } catch (_) {
+        peer = new Peer(directPeerId);
       }
     } else {
-      // On Vercel / Cloud, use global PeerJS cloud infrastructure with STUN/TURN
-      peerInstance = new Peer(directPeerId, {
+      // Production Vercel / Cloudflare
+      peer = new Peer(directPeerId, {
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -119,32 +112,30 @@ export default function App() {
       });
     }
 
-    peerRef.current = peerInstance;
+    peerRef.current = peer;
 
-    peerInstance.on('open', (id) => {
+    peer.on('open', (id) => {
       setPeerId(id);
-      setIsPeerReady(true);
-      setStatus('Sẵn sàng kết nối P2P');
-      registerWithServer(id, deviceName);
+      setStatusText('Ready to connect');
+      announcePresence(id, deviceName);
     });
 
-    peerInstance.on('connection', (conn) => {
+    peer.on('connection', (conn) => {
       connRef.current = conn;
-      setupConnectionHandlers(conn);
+      bindConnectionEvents(conn);
     });
 
-    peerInstance.on('error', (err) => {
-      console.warn('PeerJS event:', err.type, err);
+    peer.on('error', (err) => {
+      console.warn('P2P Status:', err.type);
       if (err.type === 'unavailable-id') {
-        // Regenerate PIN if collision
-        const newPin = Math.floor(100000 + Math.random() * 900000).toString();
-        sessionStorage.setItem('dropbridge_pin', newPin);
-        setMyPin(newPin);
+        const nextPin = Math.floor(100000 + Math.random() * 900000).toString();
+        sessionStorage.setItem('cuvodrop_pin', nextPin);
+        setMyPin(nextPin);
         window.location.reload();
       }
     });
 
-    // Check URL parameters for Auto-Join via PIN
+    // Handle auto-join URL ?pin=123456
     const params = new URLSearchParams(window.location.search);
     const pinParam = params.get('pin');
     if (pinParam) {
@@ -152,11 +143,11 @@ export default function App() {
       setActiveTab('pin');
     }
 
-    // Polling discovery peers on same Wi-Fi
+    // Polling Wi-Fi radar peers
     const interval = setInterval(() => {
-      if (peerRef.current && peerRef.current.id) {
-        fetchPeers(peerRef.current.id);
-        registerWithServer(peerRef.current.id, deviceName);
+      if (peerRef.current?.id) {
+        syncRadarPeers(peerRef.current.id);
+        announcePresence(peerRef.current.id, deviceName);
       }
     }, 3500);
 
@@ -166,7 +157,7 @@ export default function App() {
     };
   }, [deviceName]);
 
-  const registerWithServer = async (id, name) => {
+  const announcePresence = async (id, name) => {
     try {
       await fetch('/register', {
         method: 'POST',
@@ -176,72 +167,33 @@ export default function App() {
     } catch (_) {}
   };
 
-  const fetchPeers = async (currentId) => {
+  const syncRadarPeers = async (myId) => {
     try {
       const res = await fetch('/peers');
       const data = await res.json();
       if (data.peers) {
-        setPeers(data.peers.filter(p => p.peerId !== currentId));
+        setPeers(data.peers.filter(p => p.peerId !== myId));
       }
     } catch (_) {}
   };
 
-  const generatePin = async (id) => {
-    const pin = Math.floor(100000 + Math.random() * 900000).toString();
-    setMyPin(pin);
-    try {
-      await fetch('/room/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ peerId: id, deviceName, pin })
-      });
-    } catch (_) {}
-  };
-
-  const handleJoinPin = async (e) => {
-    e.preventDefault();
-    setPinError('');
-    const targetPin = inputPin.trim();
-    if (!targetPin || targetPin.length < 6) {
-      setPinError('Vui lòng nhập đủ 6 chữ số mã PIN');
-      return;
-    }
-
-    setStatus(`Đang kết nối tới mã PIN ${targetPin}...`);
-    const directTargetPeerId = `drop-${targetPin}`;
-    
-    // Connect directly via P2P
-    handleDeviceClick(directTargetPeerId, `Thiết bị #${targetPin}`);
-  };
-
-  // Setup connection event handlers
-  const setupConnectionHandlers = (conn) => {
-    conn.on('data', (data) => {
-      handleIncomingData(data, conn);
-    });
-
+  const bindConnectionEvents = (conn) => {
+    conn.on('data', (data) => processIncomingData(data, conn));
     conn.on('open', () => {
-      setStatus(`Đã liên kết với ${conn.metadata?.deviceName || 'thiết bị đối tác'}!`);
+      setStatusText(`Connected to ${conn.metadata?.deviceName || 'partner device'}`);
     });
-
     conn.on('close', () => {
-      setStatus('Kết nối P2P đã đóng');
-    });
-
-    conn.on('error', (err) => {
-      console.error('Conn error:', err);
+      setStatusText('P2P connection closed');
     });
   };
 
-  // Handle incoming chunked data packets
-  const handleIncomingData = (data, conn) => {
-    if (data.type === 'file-start') {
+  const processIncomingData = (data, conn) => {
+    if (data.type === 'file-meta') {
       rxBufferRef.current = [];
       rxMetaRef.current = data;
       rxStartTimeRef.current = Date.now();
-      rxLastBytesRef.current = 0;
 
-      setTransferState({
+      setTransfer({
         mode: 'receiving',
         fileName: data.name,
         fileSize: data.size,
@@ -250,71 +202,84 @@ export default function App() {
         speed: 0,
         bytesDone: 0,
         totalBytes: data.size,
-        eta: 'Đang tính...'
+        eta: 'Estimating...'
       });
-      setStatus(`Đang nhận: ${data.name}`);
+      setStatusText(`Receiving ${data.name}`);
     } else if (data.type === 'file-chunk') {
       rxBufferRef.current.push(data.chunk);
       const currentBytes = rxBufferRef.current.reduce((acc, c) => acc + c.byteLength, 0);
       const total = rxMetaRef.current?.size || 1;
       const progress = Math.min(100, Math.round((currentBytes / total) * 100));
 
-      const elapsedSec = (Date.now() - rxStartTimeRef.current) / 1000;
-      const speed = elapsedSec > 0.5 ? Math.round(currentBytes / elapsedSec) : 0;
+      const elapsed = (Date.now() - rxStartTimeRef.current) / 1000;
+      const speed = elapsed > 0.3 ? Math.round(currentBytes / elapsed) : 0;
       const remainingBytes = total - currentBytes;
       const etaSec = speed > 0 ? Math.ceil(remainingBytes / speed) : 0;
 
-      setTransferState(prev => prev ? ({
+      setTransfer(prev => prev ? ({
         ...prev,
         progress,
         speed,
         bytesDone: currentBytes,
-        eta: etaSec > 0 ? `${etaSec}s` : 'Sắp xong'
+        eta: etaSec > 0 ? `${etaSec}s left` : 'Almost done...'
       }) : null);
-    } else if (data.type === 'file-end') {
+    } else if (data.type === 'file-complete') {
       const meta = rxMetaRef.current;
-      const blob = new Blob(rxBufferRef.current, { type: meta?.mimeType || 'application/octet-stream' });
-      const fileUrl = URL.createObjectURL(blob);
+      const blob = new Blob(rxBufferRef.current, { type: meta?.mimeType || 'video/mp4' });
+      const mediaUrl = URL.createObjectURL(blob);
 
-      // Trigger Celebration
       confetti({
         particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 }
+        spread: 80,
+        origin: { y: 0.55 }
       });
 
       // Auto trigger download for mobile compatibility
       const a = document.createElement('a');
-      a.href = fileUrl;
-      a.download = meta?.name || 'video_received.mp4';
+      a.href = mediaUrl;
+      a.download = meta?.name || 'cuvodrop_video.mp4';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
 
-      setReceivedFile({
-        name: meta?.name || 'File đã nhận',
+      setReceivedMedia({
+        name: meta?.name || 'Received File',
         size: meta?.size || 0,
-        url: fileUrl,
+        url: mediaUrl,
         mimeType: meta?.mimeType || 'video/mp4'
       });
 
-      setTransferState(null);
-      setStatus('Nhận video thành công!');
+      setTransfer(null);
+      setStatusText('File received successfully!');
     }
   };
 
-  const handleDeviceClick = (targetId, targetName = '') => {
+  const handleDeviceSelect = (targetId, targetName = '') => {
     targetPeerRef.current = { id: targetId, name: targetName };
     fileInputRef.current.click();
   };
 
-  // High-performance chunked file sender with backpressure
-  const handleFileSelect = async (e) => {
-    const file = e.target.files[0];
-    if (!file || !targetPeerRef.current) return;
+  const handlePinConnect = (e) => {
+    e.preventDefault();
+    const pin = inputPin.trim();
+    if (pin.length < 6) {
+      alert('Please enter a valid 6-digit PIN code');
+      return;
+    }
+    const targetPeerId = `cuvo-${pin}`;
+    handleDeviceSelect(targetPeerId, `Device #${pin}`);
+  };
 
+  const handleFilePicked = async (e) => {
+    const file = e.target.files ? e.target.files[0] : null;
+    if (!file || !targetPeerRef.current) return;
+    await sendFilePayload(file);
+    e.target.value = '';
+  };
+
+  const sendFilePayload = async (file) => {
     const targetId = targetPeerRef.current.id;
-    setStatus(`Đang kết nối tới ${targetPeerRef.current.name || 'thiết bị'}...`);
+    setStatusText(`Connecting to ${targetPeerRef.current.name}...`);
 
     let conn = connRef.current;
     if (!conn || conn.peer !== targetId || !conn.open) {
@@ -323,29 +288,28 @@ export default function App() {
         reliable: true
       });
       connRef.current = conn;
-      setupConnectionHandlers(conn);
+      bindConnectionEvents(conn);
 
       await new Promise((resolve, reject) => {
         conn.on('open', resolve);
         conn.on('error', reject);
-        setTimeout(() => reject(new Error('Hết thời gian chờ kết nối')), 8000);
+        setTimeout(() => reject(new Error('Connection timed out')), 10000);
       }).catch(err => {
-        alert('Không thể kết nối trực tiếp đến thiết bị: ' + err.message);
+        alert('Could not establish direct P2P connection: ' + err.message);
         return;
       });
     }
 
-    // Start Sending in Chunks
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
     conn.send({
-      type: 'file-start',
+      type: 'file-meta',
       name: file.name,
       size: file.size,
       mimeType: file.type || 'video/mp4',
       totalChunks
     });
 
-    setTransferState({
+    setTransfer({
       mode: 'sending',
       fileName: file.name,
       fileSize: file.size,
@@ -353,25 +317,23 @@ export default function App() {
       speed: 0,
       bytesDone: 0,
       totalBytes: file.size,
-      eta: 'Đang chuẩn bị...'
+      eta: 'Starting...'
     });
 
     const startTime = Date.now();
     let offset = 0;
-    let chunkIndex = 0;
-
-    const dataChannel = conn.dataChannel;
+    let index = 0;
+    const channel = conn.dataChannel;
 
     while (offset < file.size) {
-      // Backpressure Check: wait if buffer gets full
-      if (dataChannel && dataChannel.bufferedAmount > MAX_BUFFERED_AMOUNT) {
+      if (channel && channel.bufferedAmount > MAX_BUFFERED_AMOUNT) {
         await new Promise(res => {
-          const checkInterval = setInterval(() => {
-            if (dataChannel.bufferedAmount < MAX_BUFFERED_AMOUNT / 2) {
-              clearInterval(checkInterval);
+          const poll = setInterval(() => {
+            if (channel.bufferedAmount < MAX_BUFFERED_AMOUNT / 2) {
+              clearInterval(poll);
               res();
             }
-          }, 30);
+          }, 25);
         });
       }
 
@@ -381,342 +343,389 @@ export default function App() {
       conn.send({
         type: 'file-chunk',
         chunk: buffer,
-        index: chunkIndex
+        index
       });
 
       offset += buffer.byteLength;
-      chunkIndex++;
+      index++;
 
-      const elapsedSec = (Date.now() - startTime) / 1000;
-      const speed = elapsedSec > 0.3 ? Math.round(offset / elapsedSec) : 0;
-      const remainingBytes = file.size - offset;
-      const etaSec = speed > 0 ? Math.ceil(remainingBytes / speed) : 0;
+      const elapsed = (Date.now() - startTime) / 1000;
+      const speed = elapsed > 0.3 ? Math.round(offset / elapsed) : 0;
+      const remaining = file.size - offset;
+      const etaSec = speed > 0 ? Math.ceil(remaining / speed) : 0;
       const progress = Math.min(100, Math.round((offset / file.size) * 100));
 
-      setTransferState(prev => prev ? ({
+      setTransfer(prev => prev ? ({
         ...prev,
         progress,
         speed,
         bytesDone: offset,
-        eta: etaSec > 0 ? `${etaSec}s còn lại` : 'Sắp xong'
+        eta: etaSec > 0 ? `${etaSec}s left` : 'Almost done...'
       }) : null);
     }
 
-    // Finished
-    conn.send({ type: 'file-end' });
+    conn.send({ type: 'file-complete' });
 
-    confetti({
-      particleCount: 60,
-      spread: 60,
-      origin: { y: 0.7 }
-    });
+    confetti({ particleCount: 70, spread: 70, origin: { y: 0.6 } });
 
     setTimeout(() => {
-      setTransferState(null);
-      setStatus(`Đã gửi thành công ${file.name}!`);
+      setTransfer(null);
+      setStatusText(`Sent ${file.name} successfully!`);
     }, 1500);
-
-    // Reset input
-    e.target.value = '';
   };
 
-  const handleEditName = () => {
-    const newName = prompt('Nhập tên gợi nhớ cho thiết bị của bạn:', deviceName);
-    if (newName && newName.trim() !== '') {
-      const clean = newName.trim();
+  const copyShareLink = () => {
+    const url = `${window.location.origin}?pin=${myPin}`;
+    navigator.clipboard.writeText(url);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const changeDeviceName = () => {
+    const next = prompt('Enter a display name for your device:', deviceName);
+    if (next && next.trim()) {
+      const clean = next.trim();
       setDeviceName(clean);
-      localStorage.setItem('dropbridge_deviceName', clean);
+      localStorage.setItem('cuvodrop_dev_name', clean);
       if (peerRef.current?.id) {
-        registerWithServer(peerRef.current.id, clean);
+        announcePresence(peerRef.current.id, clean);
       }
     }
   };
 
-  const copyPinUrl = () => {
-    const url = `${window.location.origin}?pin=${myPin}`;
-    navigator.clipboard.writeText(url);
-    setIsCopiedPin(true);
-    setTimeout(() => setIsCopiedPin(false), 2000);
+  const getPlatformIcon = (name) => {
+    if (name.includes('iPhone') || name.includes('iPad')) return <Smartphone size={24} />;
+    if (name.includes('Android')) return <Smartphone size={24} />;
+    if (name.includes('MacBook')) return <Laptop size={24} />;
+    return <Monitor size={24} />;
   };
 
   return (
-    <div className="app-layout">
-      {/* AD SLOT: TOP LEADERBOARD BANNER */}
-      <div className="ad-container ad-top">
-        <div className="ad-label">Sponsored Advertisement</div>
-        <div className="ad-placeholder">
-          <span>Google AdSense Banner (728x90 / 320x50 Responsive)</span>
+    <div className="cuvo-app">
+      {/* BACKGROUND GLOW */}
+      <div className="bg-glow-orb orb-1"></div>
+      <div className="bg-glow-orb orb-2"></div>
+
+      {/* TOP NAVBAR */}
+      <header className="cuvo-navbar">
+        <div className="nav-container">
+          <div className="brand-group">
+            <div className="brand-logo">
+              <Zap size={20} className="brand-icon" />
+            </div>
+            <div className="brand-titles">
+              <h1 className="brand-name">CuvoDrop</h1>
+              <span className="brand-badge">by Cuvotech</span>
+            </div>
+          </div>
+
+          <div className="status-pill">
+            <span className="status-dot"></span>
+            <span className="status-msg">{statusText}</span>
+          </div>
+        </div>
+      </header>
+
+      {/* TOP AD BANNER */}
+      <div className="ad-wrapper top-ad">
+        <div className="ad-box">
+          <span className="ad-tag">Advertisement</span>
+          <div className="ad-slot-placeholder">
+            <span>Google AdSense Banner (728x90 / Responsive)</span>
+          </div>
         </div>
       </div>
 
-      <div className="container">
-        {/* Header */}
-        <header className="header">
-          <div className="logo-badge">
-            <Zap size={22} className="logo-icon" />
-            <span className="logo-text">DropBridge</span>
+      {/* MAIN HERO CARD */}
+      <main className="main-wrapper">
+        <div className="hero-card">
+          {/* TAB BAR */}
+          <div className="hero-tabs">
+            <button 
+              className={`tab-item ${activeTab === 'radar' ? 'active' : ''}`}
+              onClick={() => setActiveTab('radar')}
+            >
+              <Wifi size={17} /> Radar (Same Wi-Fi)
+            </button>
+            <button 
+              className={`tab-item ${activeTab === 'pin' ? 'active' : ''}`}
+              onClick={() => setActiveTab('pin')}
+            >
+              <KeyRound size={17} /> PIN / QR Code (4G & Cross-Network)
+            </button>
           </div>
-          <p className="header-desc">Chuyển Video iOS sang Android tức thì (P2P 4K)</p>
-          <div className="status-pill">
-            <span className="pulse-dot"></span>
-            {status}
-          </div>
-        </header>
 
-        {/* Tab Navigation */}
-        <div className="tab-bar">
-          <button 
-            className={`tab-btn ${activeTab === 'wifi' ? 'active' : ''}`}
-            onClick={() => setActiveTab('wifi')}
-          >
-            <Wifi size={16} /> Quét Wi-Fi Cùng Mạng
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'pin' ? 'active' : ''}`}
-            onClick={() => setActiveTab('pin')}
-          >
-            <KeyRound size={16} /> Mã PIN / QR (4G & Khác Mạng)
-          </button>
-        </div>
-
-        <main className="main-content">
-          {/* User Device Badge */}
-          <div className="my-device-card">
-            <div className="my-device-avatar">
-              {deviceName.includes('iPhone') || deviceName.includes('Android') ? <Smartphone size={32} /> : <Monitor size={32} />}
+          {/* SENDER IDENTITY BAR */}
+          <div className="identity-bar">
+            <div className="identity-avatar">
+              {getPlatformIcon(deviceName)}
             </div>
-            <div className="my-device-info">
-              <span className="info-label">Thiết bị của bạn:</span>
-              <div className="device-name-row">
-                <span className="device-name-text">{deviceName}</span>
-                <button className="edit-btn" onClick={handleEditName} title="Đổi tên thiết bị">
-                  <Edit3 size={14} /> Đổi tên
+            <div className="identity-text">
+              <span className="identity-sub">Your Device</span>
+              <div className="identity-name-row">
+                <strong className="identity-title">{deviceName}</strong>
+                <button className="btn-rename" onClick={changeDeviceName}>
+                  <Edit2 size={12} /> Rename
                 </button>
               </div>
             </div>
           </div>
 
-          {/* TAB 1: SAME WI-FI RADAR */}
-          {activeTab === 'wifi' && (
-            <section className="section-block">
-              <div className="section-header">
-                <h3>Thiết bị lân cận</h3>
-                <span className="section-hint">Cùng kết nối Wi-Fi</span>
-              </div>
-
+          {/* TAB 1: RADAR WI-FI */}
+          {activeTab === 'radar' && (
+            <div className="radar-container">
               {peers.length === 0 ? (
-                <div className="radar-radar-box">
-                  <div className="radar-circle">
-                    <div className="radar-wave wave1"></div>
-                    <div className="radar-wave wave2"></div>
-                    <div className="radar-wave wave3"></div>
-                    <div className="radar-center">
-                      <Wifi size={28} className="pulse" />
+                <div className="radar-sonar-wrap">
+                  <div className="sonar-waves">
+                    <div className="sonar-wave s1"></div>
+                    <div className="sonar-wave s2"></div>
+                    <div className="sonar-wave s3"></div>
+                    <div className="sonar-core">
+                      <Wifi size={32} />
                     </div>
                   </div>
-                  <p className="radar-title">Đang quét thiết bị cùng Wi-Fi...</p>
-                  <p className="radar-desc">Hãy mở trang web này trên iPhone hoặc Android còn lại để tự động tìm thấy nhau.</p>
+                  <h3 className="radar-status-head">Searching for nearby devices...</h3>
+                  <p className="radar-status-sub">
+                    Open <strong>share.cuvotech.com</strong> on your iPhone or Android phone to discover each other automatically.
+                  </p>
+                  <div className="radar-tip-box">
+                    <span>💡 If devices are on mobile data (4G/5G) or different networks, use the <strong>PIN / QR Code</strong> tab above.</span>
+                  </div>
                 </div>
               ) : (
-                <div className="peer-grid">
-                  {peers.map((p) => (
-                    <div 
-                      key={p.peerId} 
-                      className="peer-card-modern" 
-                      onClick={() => handleDeviceClick(p.peerId, p.deviceName)}
-                    >
-                      <div className="peer-avatar">
-                        {p.deviceName.includes('iPhone') || p.deviceName.includes('Android') ? <Smartphone size={28} /> : <Monitor size={28} />}
+                <div className="peers-found-view">
+                  <h3 className="found-title">Devices Ready to Receive:</h3>
+                  <div className="peer-cards-list">
+                    {peers.map((p) => (
+                      <div 
+                        key={p.peerId} 
+                        className="peer-card-bubble"
+                        onClick={() => handleDeviceSelect(p.peerId, p.deviceName)}
+                      >
+                        <div className="peer-icon-avatar">
+                          {getPlatformIcon(p.deviceName)}
+                        </div>
+                        <span className="peer-card-name">{p.deviceName}</span>
+                        <button className="peer-send-action">
+                          <Upload size={14} /> Send Video / File
+                        </button>
                       </div>
-                      <h4 className="peer-title">{p.deviceName}</h4>
-                      <button className="peer-action-btn">
-                        <Upload size={14} /> Gửi Video / File
-                      </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
-            </section>
+            </div>
           )}
 
-          {/* TAB 2: PIN / QR CODE (FOR 4G OR AP ISOLATION) */}
+          {/* TAB 2: PIN / QR CODE */}
           {activeTab === 'pin' && (
-            <section className="section-block pin-block">
-              <div className="pin-card-wrapper">
-                <h4>Ghép đôi bằng mã PIN 6 số</h4>
-                <p className="pin-desc">Dùng khi 1 máy bật 4G, hoặc mạng Wi-Fi bật chế độ chặn thiết bị nội bộ.</p>
-
-                {myPin && (
-                  <div className="my-pin-display">
-                    <span className="pin-title">Mã PIN của máy này:</span>
-                    <div className="pin-number">{myPin}</div>
-                    
-                    <div className="qr-wrapper">
-                      <QRCodeSVG 
-                        value={`${window.location.origin}?pin=${myPin}`}
-                        size={140}
-                        level="M"
-                        includeMargin={true}
-                      />
-                      <span className="qr-label">Quét mã QR bằng camera điện thoại</span>
-                    </div>
-
-                    <button className="copy-link-btn" onClick={copyPinUrl}>
-                      {isCopiedPin ? <Check size={16} /> : <Copy size={16} />}
-                      {isCopiedPin ? 'Đã sao chép link ghép đôi!' : 'Sao chép link kết nối'}
-                    </button>
+            <div className="pin-container">
+              <div className="pin-two-col">
+                {/* MY PIN DISPLAY */}
+                <div className="pin-panel my-pin-box">
+                  <span className="pin-panel-badge">This Device's PIN</span>
+                  <div className="pin-giant-code">{myPin}</div>
+                  
+                  <div className="qr-box-inner">
+                    <QRCodeSVG 
+                      value={`${window.location.origin}?pin=${myPin}`}
+                      size={150}
+                      level="H"
+                      includeMargin={true}
+                    />
+                    <span className="qr-hint">Scan with phone camera to connect</span>
                   </div>
-                )}
 
-                <div className="pin-separator">
-                  <span>HOẶC NHẬP MÃ PIN MÁY KHÁC</span>
-                </div>
-
-                <form onSubmit={handleJoinPin} className="pin-input-form">
-                  <input 
-                    type="number" 
-                    placeholder="Nhập mã 6 chữ số..." 
-                    value={inputPin}
-                    onChange={(e) => setInputPin(e.target.value)}
-                    maxLength={6}
-                    className="pin-input-box"
-                  />
-                  <button type="submit" className="pin-connect-btn">
-                    Kết nối ngay
+                  <button className="btn-copy-share" onClick={copyShareLink}>
+                    {isCopied ? <Check size={16} /> : <Share2 size={16} />}
+                    {isCopied ? 'Link Copied to Clipboard!' : 'Copy Direct Link'}
                   </button>
-                </form>
-                {pinError && <div className="pin-error-msg"><AlertCircle size={14} /> {pinError}</div>}
+                </div>
+
+                {/* JOIN PIN FORM */}
+                <div className="pin-panel join-pin-box">
+                  <span className="pin-panel-badge">Enter Receiver's PIN</span>
+                  <p className="join-hint">Enter the 6-digit code shown on the target phone or computer:</p>
+                  
+                  <form onSubmit={handlePinConnect} className="join-form">
+                    <input 
+                      type="number"
+                      placeholder="• • • • • •"
+                      value={inputPin}
+                      onChange={(e) => setInputPin(e.target.value)}
+                      maxLength={6}
+                      className="input-pin-digits"
+                      autoFocus
+                    />
+                    <button type="submit" className="btn-join-submit">
+                      <ArrowRight size={18} /> Connect & Send File
+                    </button>
+                  </form>
+                  <p className="security-note">
+                    <Shield size={14} /> Direct end-to-end encrypted WebRTC channel
+                  </p>
+                </div>
               </div>
-            </section>
+            </div>
           )}
-
-          {/* Hidden File Picker */}
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            style={{ display: 'none' }} 
-            onChange={handleFileSelect}
-            accept="video/*,image/*,application/*"
-          />
-
-          {/* SEO & EDUCATIONAL SECTION FOR ADSENSE APPROVAL */}
-          <section className="seo-section">
-            <h3>Vì sao nên dùng DropBridge để chuyển Video?</h3>
-            <div className="feature-grid">
-              <div className="feature-item">
-                <Zap size={20} className="feature-icon" />
-                <div>
-                  <strong>Tốc độ mạng nội bộ cực cao:</strong> Video 4K 1GB truyền trực tiếp qua sóng Wi-Fi P2P trong vài chục giây.
-                </div>
-              </div>
-              <div className="feature-item">
-                <ShieldCheck size={20} className="feature-icon" />
-                <div>
-                  <strong>Bảo mật 100% riêng tư:</strong> File không lưu lên bất kỳ đám mây nào, truyền thẳng máy sang máy.
-                </div>
-              </div>
-              <div className="feature-item">
-                <Smartphone size={20} className="feature-icon" />
-                <div>
-                  <strong>Không cần cài đặt app:</strong> Hoạt động ngay trên Safari (iPhone) và Chrome (Android/PC).
-                </div>
-              </div>
-            </div>
-          </section>
-        </main>
-      </div>
-
-      {/* AD SLOT: FOOTER BANNER */}
-      <div className="ad-container ad-bottom">
-        <div className="ad-label">Sponsored Advertisement</div>
-        <div className="ad-placeholder">
-          <span>Google AdSense Banner (728x90 Responsive)</span>
         </div>
-      </div>
 
-      {/* MODAL: LIVE TRANSFER PROGRESS & IN-MODAL AD */}
-      {transferState && (
-        <div className="modal-backdrop">
-          <div className="transfer-modal-card">
-            <div className="transfer-modal-header">
-              <div className="transfer-icon-pulse">
-                {transferState.mode === 'sending' ? <Upload size={32} /> : <Download size={32} />}
+        {/* BOTTOM AD BANNER */}
+        <div className="ad-wrapper bottom-ad">
+          <div className="ad-box">
+            <span className="ad-tag">Advertisement</span>
+            <div className="ad-slot-placeholder">
+              <span>Google AdSense Banner (728x90 Responsive)</span>
+            </div>
+          </div>
+        </div>
+
+        {/* VALUE PROPOSITION / FEATURES SECTION FOR GOOGLE SEO & ADSENSE APPROVAL */}
+        <section className="seo-features-section">
+          <div className="features-header">
+            <h2>Fast, Lossless Video Transfer Between iOS & Android</h2>
+            <p>Zero compression, unlimited file size, works right inside your mobile browser.</p>
+          </div>
+
+          <div className="features-grid">
+            <div className="feature-card">
+              <div className="feature-icon-badge">
+                <Zap size={22} />
               </div>
-              <h3>{transferState.mode === 'sending' ? 'Đang gửi video...' : 'Đang nhận video...'}</h3>
-              <p className="transfer-filename">{transferState.fileName}</p>
+              <h4>Lossless 4K 60fps Quality</h4>
+              <p>Unlike chat apps that aggressively compress media, CuvoDrop transfers the original uncompressed raw file bit-by-bit.</p>
             </div>
 
-            {/* Progress Bar & Details */}
-            <div className="progress-details">
-              <div className="progress-bar-container">
-                <div 
-                  className="progress-bar-fill" 
-                  style={{ width: `${transferState.progress}%` }}
-                ></div>
+            <div className="feature-card">
+              <div className="feature-icon-badge">
+                <Shield size={22} />
               </div>
-
-              <div className="stats-row">
-                <span className="stat-percent">{transferState.progress}%</span>
-                <span className="stat-speed">{formatSpeed(transferState.speed)}</span>
-                <span className="stat-eta">{transferState.eta}</span>
-              </div>
-
-              <div className="stats-size">
-                {formatBytes(transferState.bytesDone)} / {formatBytes(transferState.totalBytes)}
-              </div>
+              <h4>100% P2P & Private</h4>
+              <p>Files stream directly between devices via peer-to-peer data channels. No file is ever saved on any cloud server.</p>
             </div>
 
-            {/* AD BANNER INSIDE TRANSFER MODAL (High CTR) */}
-            <div className="modal-ad-box">
-              <div className="ad-label">Quảng cáo tài trợ trong lúc chờ truyền file</div>
-              <div className="modal-ad-placeholder">
-                <span>Quảng cáo Ads/Banner tương tác (300x100)</span>
+            <div className="feature-card">
+              <div className="feature-icon-badge">
+                <HardDrive size={22} />
+              </div>
+              <h4>No App Installation</h4>
+              <p>Works instantly on Safari (iPhone/iPad) and Chrome (Android/Windows/Mac) with zero setup.</p>
+            </div>
+          </div>
+
+          {/* FAQ ACCORDION FOR SEARCH SNIPPETS */}
+          <div className="faq-section">
+            <h3 className="faq-title">Frequently Asked Questions</h3>
+            
+            <div className="faq-item" onClick={() => setActiveFaq(activeFaq === 1 ? null : 1)}>
+              <div className="faq-q">
+                <span>How to transfer large 4K videos from iPhone to Android?</span>
+                {activeFaq === 1 ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </div>
+              {activeFaq === 1 && (
+                <div className="faq-a">
+                  Simply open <strong>share.cuvotech.com</strong> on both devices. Scan the QR code or enter the 6-digit PIN to pair, then pick any 4K video from your iPhone Photos gallery to stream directly to your Android device at high Wi-Fi speeds.
+                </div>
+              )}
+            </div>
+
+            <div className="faq-item" onClick={() => setActiveFaq(activeFaq === 2 ? null : 2)}>
+              <div className="faq-q">
+                <span>Is there any file size limit?</span>
+                {activeFaq === 2 ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </div>
+              {activeFaq === 2 && (
+                <div className="faq-a">
+                  No limit at all. Thanks to our chunked 64KB streaming engine with backpressure control, you can send files from 100MB to tens of gigabytes without running out of browser memory.
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {/* FOOTER */}
+      <footer className="cuvo-footer">
+        <p>© 2026 CuvoDrop - Ultra-fast P2P transfer engine powered by <strong>Cuvotech</strong>.</p>
+      </footer>
+
+      {/* HIDDEN FILE INPUT */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        style={{ display: 'none' }} 
+        onChange={handleFilePicked}
+        accept="video/*,image/*,application/*"
+      />
+
+      {/* TRANSFER MODAL */}
+      {transfer && (
+        <div className="modal-scrim">
+          <div className="transfer-card-pop">
+            <div className="transfer-pop-anim">
+              {transfer.mode === 'sending' ? <Upload size={32} className="float-anim" /> : <Download size={32} className="float-anim" />}
+            </div>
+            
+            <h3 className="transfer-pop-title">
+              {transfer.mode === 'sending' ? 'Sending Video...' : 'Receiving Video...'}
+            </h3>
+            <p className="transfer-pop-name">{transfer.fileName}</p>
+
+            <div className="transfer-progress-track">
+              <div className="transfer-progress-bar" style={{ width: `${transfer.progress}%` }}></div>
+            </div>
+
+            <div className="transfer-metrics">
+              <span className="metric-pct">{transfer.progress}%</span>
+              <span className="metric-speed">{formatSpeed(transfer.speed)}</span>
+              <span className="metric-eta">{transfer.eta}</span>
+            </div>
+
+            <div className="transfer-sizes">
+              {formatBytes(transfer.bytesDone)} / {formatBytes(transfer.totalBytes)}
+            </div>
+
+            {/* HIGH-CTR MODAL AD BANNER */}
+            <div className="modal-sponsor-box">
+              <span className="modal-sponsor-tag">Sponsor</span>
+              <div className="modal-ad-creative">
+                <span>Interactive ad banner during file transmission</span>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: RECEIVED FILE PREVIEW */}
-      {receivedFile && (
-        <div className="modal-backdrop">
-          <div className="preview-modal-card">
-            <button className="close-preview-btn" onClick={() => setReceivedFile(null)}>
+      {/* RECEIVED VIDEO PREVIEW MODAL */}
+      {receivedMedia && (
+        <div className="modal-scrim">
+          <div className="preview-card-pop">
+            <button className="preview-close-btn" onClick={() => setReceivedMedia(null)}>
               <X size={20} />
             </button>
 
-            <div className="preview-header">
-              <CheckCircle2 size={40} className="success-icon" />
-              <h3>Đã nhận thành công!</h3>
-              <p className="preview-name">{receivedFile.name} ({formatBytes(receivedFile.size)})</p>
+            <div className="preview-top">
+              <CheckCircle2 size={36} className="success-check-icon" />
+              <h3>Video Received Successfully!</h3>
+              <p>{receivedMedia.name} ({formatBytes(receivedMedia.size)})</p>
             </div>
 
-            {/* Video player preview if it's video */}
-            {receivedFile.mimeType.includes('video') ? (
-              <div className="video-player-container">
-                <video 
-                  src={receivedFile.url} 
-                  controls 
-                  playsInline 
-                  className="inline-video-player"
-                />
+            {receivedMedia.mimeType.includes('video') ? (
+              <div className="preview-media-viewport">
+                <video src={receivedMedia.url} controls playsInline className="preview-video-elem" />
               </div>
-            ) : receivedFile.mimeType.includes('image') ? (
-              <div className="image-player-container">
-                <img src={receivedFile.url} alt="Received media" className="inline-image-player" />
+            ) : receivedMedia.mimeType.includes('image') ? (
+              <div className="preview-media-viewport">
+                <img src={receivedMedia.url} alt="Received" className="preview-img-elem" />
               </div>
             ) : null}
 
-            <div className="preview-actions">
-              <a 
-                href={receivedFile.url} 
-                download={receivedFile.name} 
-                className="save-btn"
-              >
-                <Download size={18} /> Lưu / Tải lại vào máy
+            <div className="preview-button-row">
+              <a href={receivedMedia.url} download={receivedMedia.name} className="btn-download-save">
+                <Download size={18} /> Save Video to Device
               </a>
-              <button className="done-btn" onClick={() => setReceivedFile(null)}>
-                Xong
+              <button className="btn-preview-done" onClick={() => setReceivedMedia(null)}>
+                Close
               </button>
             </div>
           </div>
